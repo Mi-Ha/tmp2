@@ -4,3 +4,5 @@ in_vv_progr13new1218
 T2  13
 T2  7
 T2  4
+
+T2 71
