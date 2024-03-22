@@ -1,0 +1,1116 @@
+@using EmasMotesCore.Models.Models_EMAS;
+@using EmasMotesCore.Models.ModelsDTO;
+@using EmasMotesCore.Helpers;
+@using EmasMotesCore.Controllers;
+
+<script>
+    var checkInProccess = false;
+    var checkInProccess2 = false;
+    var myValue = '@ViewBag.IsAD';
+    var n_roleId;
+      
+    function checkIsAD(){
+        if (myValue == 'False') {
+            $("#btnRefreshRole").hide("true");
+        }
+    }
+
+    function IsFullControlChanged(e) {
+    //debugger;
+        if (checkInProccess2 == false) {
+            checkInProccess = true;
+            $("#IsCreateCBX").dxCheckBox("instance").option("value", e.value);
+            $("#IsEditCBX").dxCheckBox("instance").option("value", e.value);
+            $("#IsDeleteCBX").dxCheckBox("instance").option("value", e.value);
+            checkInProccess = false;
+            return true;
+        }
+        else {
+            return true;
+        }
+    }
+
+    function eccessRightsGridStateChanged(e) {
+//      debugger;
+        if ((e.dataField === 'IsCreate' || e.dataField === 'IsEdit' || e.dataField === 'IsDelete') && e.parentType === 'dataRow') {
+            const defaultValueChangeHandler = e.editorOptions.onValueChanged;
+            e.editorOptions.onValueChanged = function (args) {
+                CBXStateChanged(args);
+                defaultValueChangeHandler(args);
+            }
+        }
+        else if ((e.dataField === 'IsFullControl') && e.parentType === 'dataRow'){
+            const defaultValueChangeHandler = e.editorOptions.onValueChanged;
+            e.editorOptions.onValueChanged = function (args) {
+                IsFullControlChanged(args);
+                defaultValueChangeHandler(args);
+            }       
+        }
+
+}
+
+    function CBXStateChanged(e) {
+//      debugger;
+        if (checkInProccess == false) {
+            checkInProccess2 = true;
+
+            $("#IsFullControlCBX").dxCheckBox("instance").option("value", 
+                $("#IsCreateCBX").dxCheckBox("instance").option("value")
+                && $("#IsEditCBX").dxCheckBox("instance").option("value")
+                && $("#IsDeleteCBX").dxCheckBox("instance").option("value")                   
+            );
+            checkInProccess2 = false;
+            return true;
+        }
+        else{
+            return true;
+        }
+    }
+
+
+    var currentKey = -1;
+    function onEditingStart(e) {
+        currentKey = e.key;
+    }
+    
+    function setPopupTitle(e) {
+        var title = "";
+        if (currentKey > -1)
+            title = "Редактирование записи";
+        else
+            title = "Создание новой записи";
+        e.component.option("title", title);
+        currentKey = -1;
+    }
+
+    function onUserChanged() {
+        debugger;
+         $.ajax({
+            type: "POST",
+            url: '@Url.Action("UserChanged", "PermissionsControl")',
+            traditional: true,
+            data: {
+                userLogin: $("#permissionOtherUserSelectBox").dxSelectBox('instance').option("value")
+             }
+        }).done(function (response) {
+            debugger;
+            window.location.href = "@Url.Action("Index", "Home", new { httproute = "" })";
+        }).fail(function (data) {
+            //alert("Failed: " + data.response);
+        });
+    }
+
+    function saveOlapPermissionsCube() {
+    //debugger;
+        alert('saveOlapPermissionsCube');
+    }
+
+    function saveOlapPermissionsDimension() {
+    //debugger;
+        alert('saveOlapPermissionsDimension');
+    }
+
+    function getTabPanelPermissionsAD_SelectedIndex() {
+        return $("#PermissionsAD_TabPanel").dxTabPanel("instance").option("selectedIndex");
+    }
+
+    function getTabPanelPermissionsAD_SelectedTitle() {
+        var selected_index = getTabPanelPermissionsAD_SelectedIndex();
+        return $("#PermissionsAD_TabPanel").dxTabPanel("instance").option("items")[selected_index].title;
+    }
+
+    function OnSelectionChanged_PermissionsAD_TabPanel(e) {
+        debugger;
+        
+        if (getTabPanelPermissionsAD_SelectedTitle() == 'Доступ к кубам') {
+
+            $.ajax({
+                type: "GET",
+                url: '@Url.Action("OlapAccessGridColumnInit", "PermissionsControl")',
+
+                data: {
+                    mode: 'cube'
+                },
+
+                success: function (response) {
+
+                    $("#cubeAccessGrid").html("");
+                    $("#cubeAccessGrid").html(response);
+                }
+            });
+
+        } else if (getTabPanelPermissionsAD_SelectedTitle() == 'Доступ к измерениям') {
+
+            $.ajax({
+                type: "GET",
+                url: '@Url.Action("OlapAccessGridColumnInit", "PermissionsControl")',
+
+                data: {
+                    mode: 'dimension'
+                },
+                success: function (response) {
+                    $("#dimensionAccessGrid").html("");
+                    $("#dimensionAccessGrid").html(response);
+                }
+            });
+
+        } else if (getTabPanelPermissionsAD_SelectedTitle() == 'Роли по станциям') {
+
+            $.ajax({
+                type: "GET",
+                url: '@Url.Action("OlapAccessGridColumnInit", "PermissionsControl")',
+
+                data: {
+                    mode: 'rolestation'
+                },
+                success: function (response) {
+                    $("#rolestationAccessGrid").html("");
+                    $("#rolestationAccessGrid").html(response);
+                }
+            });
+
+        }
+    }
+    
+    function onClickRefresh() {
+         $.ajax({
+            url: "@Url.Action("btnRefreshRole_Click", "PermissionsControl")",                        
+            success: function () {
+                location.reload(true);
+            },
+            error: function () {
+                console.log('Error');
+            }
+        });
+    }
+     
+    function showRolePopup() {
+        var popup = $("#role-popup").dxPopup("instance");
+        popup.option("contentTemplate", $("#popup-template"));
+
+
+
+        var grid = $("#PermissionsControl").dxDataGrid("instance");
+        var sel = grid.getSelectedRowsData();
+
+        if(sel.length > 0){
+            popup.show();
+
+            var Name = grid.getSelectedRowsData()[0].Name;
+            n_roleId = grid.getSelectedRowsData()[0].Id;
+
+            $('#role-caption')[0].textContent = 'Для роли "' + Name + '" будут скопированы права следующей роли:' ;
+        }
+    }
+
+    function btnCopyRole_Click(){
+       var o_roleId = $("#lbox").dxLookup("instance").option("value");
+        
+       $.ajax({
+            url: "@Url.Action("CopyRole", "PermissionsControl")", 
+            data: {
+                o_roleId: o_roleId, n_roleId: n_roleId
+            },
+            success: function () {
+              $('#role-popup').dxPopup('hide');
+              alert("Скопировано");
+            },
+            error: function () {
+                alert("Ошибка при копирование");
+            }
+        });
+      // alert('Для роли "' + n_roleId + '" будут скопированы права следующей роли: ' + o_roleId);
+    }
+
+    function showRolePopupOlapCube() {
+        var popup = $("#roleolap-popup").dxPopup("instance");
+        popup.option("contentTemplate", $("#olappopup-template"));
+
+        popup.show();
+        //$('#roleolap-caption-security')[0].textContent = 'cube';
+
+    }
+    /*
+    function showRolePopupOlapDimension() {
+        var popup = $("#roleolap-popup").dxPopup("instance");
+        popup.option("contentTemplate", $("#olappopup-template"));
+
+        popup.show();
+        $('#roleolap-caption-security')[0].textContent = 'dimension';
+
+    }
+    */
+    function btnCopyRoleOlap_Click() {
+        debugger;
+        //var strMode = $('#roleolap-caption-security')[0].textContent;
+
+        var src_roleId = $("#lboxolapfrom").dxLookup("instance").option("value");
+        var dst_roleId = $("#lboxolapto").dxLookup("instance").option("value");
+        
+       $.ajax({
+            url: "@Url.Action("CopyRoleOlap", "PermissionsControl")", 
+            data: {
+                src_roleId: src_roleId, dst_roleId: dst_roleId
+            },
+            success: function (res) {
+              $('#roleolap-popup').dxPopup('hide');
+              alert(res);
+              $("#dxPermissionsControlCubeGrid").dxDataGrid("instance").refresh();
+
+              /*
+              if(strMode == 'cube')
+              {
+                  $("#dxPermissionsControlCubeGrid").dxDataGrid("instance").refresh();
+              }
+              else if (strMode == 'dimension') {
+                  $("#dxPermissionsControlDimensionGrid").dxDataGrid("instance").refresh();
+              }
+              */
+            },
+            error: function () {
+                alert("Ошибка при копировании");
+            }
+        });
+ 
+    }
+    
+/*
+    function copyRole() {
+
+    }
+    */
+/*
+    function loadOLAPshemaCube() {
+        //debugger;
+        console.log('label = cube');
+    }
+  */  
+    function refresh_OLAPcube() { 
+        //debugger;
+        if (!($("#dxPermissionsControlCubeGrid").dxDataGrid("instance") === undefined)) {
+            $("#dxPermissionsControlCubeGrid").dxDataGrid("instance").refresh();
+        }
+    }
+    function refresh_OLAPdimension() { 
+        //debugger;
+        if (!($("#dxPermissionsControlDimensionGrid").dxDataGrid("instance") === undefined)) {
+            $("#dxPermissionsControlDimensionGrid").dxDataGrid("instance").refresh();
+        }
+    }
+    function refresh_OLAProlebystation() { 
+        //debugger;
+        if (!($("#dxPermissionsControlStationGrid").dxDataGrid("instance") === undefined)) {
+            $("#dxPermissionsControlStationGrid").dxDataGrid("instance").refresh();
+        }
+    }
+
+    var columnIndexCube = null;
+    var columnIndexCubeOld = null;
+    function onCellClickCube(e) {
+        debugger;
+
+        if (e.rowType == "data") {
+
+            columnIndexCubeOld = columnIndexCube;
+            if(e.columnIndex == columnIndexCubeOld){
+                columnIndexCube = null;
+            }
+            else
+            {
+                columnIndexCube = e.columnIndex;
+            }
+            
+        }
+
+        if (!($("#dxPermissionsControlCubeGrid").dxDataGrid("instance") === undefined)) {
+            $("#dxPermissionsControlCubeGrid").dxDataGrid("instance").repaint();
+        }
+
+    }
+
+
+    function onCellPreparedCube(e) {
+        if (e.rowType == "data") {
+
+            if (columnIndexCube != null){
+                if(e.columnIndex == columnIndexCube){
+                    e.cellElement.css('background', 'LightGray');
+                } else {
+                    //e.cellElement.css('background', 'white');
+                }
+            }
+            if (columnIndexCubeOld != null) {
+                if (e.columnIndex == columnIndexCubeOld) {
+                    e.cellElement.css('background', 'white');
+                }
+            }
+
+        }
+    }
+
+
+
+</script>
+
+@(
+Html.DevExtreme().TabPanel()
+    .ID("PermissionsAD_TabPanel")
+    .OnSelectionChanged("OnSelectionChanged_PermissionsAD_TabPanel")
+    .Items(items =>
+    {
+        items.Add()
+                .Title("Роли")
+                .Template(new TemplateName("gridContainer-roles"))
+
+                //.Option("tabExtras", new { userId = new JS("data.Id") })
+                ;
+
+        items.Add()
+            .Title("Компоненты")
+            .Template(new TemplateName("gridContainer-components"))
+            //.Option("tabExtras", new { userId = new JS("data.Id") })
+            ;
+
+        items.Add()
+            .Title("Права доступа")
+            .Template(new TemplateName("gridContainer-eccessRights"))
+            //.Option("tabExtras", new { userId = new JS("data.Id") })
+            ;
+
+        items.Add()
+            .Title("Роли<->Отчеты")
+            .Template(new TemplateName("gridContainer-rolesReports"))
+            //.Option("tabExtras", new { userId = new JS("data.Id") })
+            ;
+
+        items.Add()
+            .Title("Роли<->Аналитические панели")
+            .Template(new TemplateName("gridContainer-analyticsPanels"))
+            //.Option("tabExtras", new { userId = new JS("data.Id") })
+            ;
+        if (!AppHelper.CheckOwner(HomeController.Owner, AppHelper.OwnerType.Rosatom))
+        {
+            items.Add()
+            .Title("Показатели на форме")
+            .Template(new TemplateName("gridContainer-inFormValues"))
+            //.Option("tabExtras", new { userId = new JS("data.Id") })
+            ;
+        }
+        items.Add()
+            .Title("Вход под другим пользователем")
+            .Template(new TemplateName("gridContainer-workAsAnotherUser"))
+            //.Option("tabExtras", new { userId = new JS("data.Id") })
+            ;
+        
+        items.Add()
+        .Title("Доступ к кубам")
+        .Template(new TemplateName("cubeAccess"))
+    //.Option("tabExtras", new { userId = new JS("data.Id") })
+        ;
+        items.Add()
+        .Title("Доступ к измерениям")
+        .Template(new TemplateName("dimensionAccess"))
+        //.Option("tabExtras", new { userId = new JS("data.Id") })
+        ;
+        items.Add()
+            .Title("Роли по станциям")
+            .Template(new TemplateName("rolestationAccess"))
+            //.Option("tabExtras", new { userId = new JS("data.Id") })
+            ;
+
+    })
+)
+
+@using (Html.DevExtreme().NamedTemplate("gridContainer-roles"))
+{
+    @(Html.DevExtreme().Button().ID("btnRefreshRole").Text("Обновить роли из AD").OnClick("onClickRefresh")) 
+    @(Html.DevExtreme().Button().ID("btnCopyRoleShow").Text("Копировать права доступа").OnClick("showRolePopup"))
+    @(Html.Emas().DataGrid<RoleDTO>()
+                .ID("PermissionsControl")
+                .ApplyConfiguration("dictionary.lite")
+                .Height("calc(100vh - 180px)")
+                .Width("70%")
+                .OnContentReady("checkIsAD")
+                .ShowBorders(true)
+                .FilterRow(filterRow => filterRow
+                .Visible(true)
+                .ApplyFilter(GridApplyFilterMode.Auto)
+
+                )
+                .HeaderFilter(headerFilter => headerFilter.Visible(true))
+                .Paging(paging => paging.PageSize(100))
+                .Pager(pager =>
+                {
+                    pager.ShowPageSizeSelector(true);
+                    pager.AllowedPageSizes(new List<int>{ 10, 20, 50, 100, 200 });
+                    pager.ShowInfo(true);
+                })
+                .DataSource(d => d.Mvc()
+                    .Controller("PermissionsControl")
+                    .LoadAction("RolesInit")
+                    .InsertAction(!@ViewBag.IsAD ? "RoleInsert":null)
+                    .UpdateAction(!@ViewBag.IsAD ? "RoleUpdate":null)
+                    .DeleteAction(!@ViewBag.IsAD ? "RoleDelete":null)
+                    .Key("Id")
+                )
+                .Editing(editing =>
+                {
+                    editing.Mode(GridEditMode.Popup)
+                        .Popup(p => p
+                        .Width(600)
+                        .Height(300)
+                        .ShowTitle(true).Title("Роль")
+                        )
+                    .Form(f => f
+                    .ColCount(1)
+                    .Items(items =>
+                    {
+                        items.AddSimpleFor(m => m.Name);
+                        items.AddSimpleFor(m => m.Description);
+                    })
+                    .LabelLocation(FormLabelLocation.Left)
+                    .ShowColonAfterLabel(true)
+                    .MinColWidth(100)
+                    .ShowValidationSummary(true)
+                    );
+                    editing.AllowAdding(!@ViewBag.IsAD);
+                    editing.AllowDeleting(!@ViewBag.IsAD);
+                    editing.AllowUpdating(!@ViewBag.IsAD);
+                    editing.UseIcons(true);
+                })
+                .Columns(columns =>
+                {
+                    columns.AddFor(r => r.Name)
+                        .Alignment(HorizontalAlignment.Left)
+                        .Width("70%")
+                        .ValidationRules(x => x.AddRequired())
+                        .Caption("Название роли");
+
+                    columns.AddFor(r => r.Description)
+                        .Alignment(HorizontalAlignment.Left)
+                        .Width("70%")
+                        .Caption("Описание");
+                }).Scrolling(scrolling => scrolling.Mode(GridScrollingMode.Standard))
+
+    )
+}
+
+@using (Html.DevExtreme().NamedTemplate("gridContainer-components"))
+{
+    @(Html.Emas().DataGrid<WebPluginDTO>()
+            .ID("WebPluginsGrid")
+            .ApplyConfiguration("dictionary.lite")
+            .Height("calc(100vh - 180px)")
+                .FilterRow(filterRow => filterRow
+                .Visible(true)
+                .ApplyFilter(GridApplyFilterMode.Auto)
+
+                )
+
+                    .DataSource(d => d.Mvc()
+                    .Controller("PermissionsControl")
+                    .LoadAction("WebPluginsInit")
+                    .InsertAction("WebPluginInsert")
+                    .UpdateAction("WebPluginUpdate")
+                    .DeleteAction("WebPluginDelete")
+
+                    .Key("Id")
+                )
+                .Editing(editing =>
+                {
+                    editing.Mode(GridEditMode.Popup)
+                        .Popup(p => p
+                        .Width(750)
+                        .Height(650)
+                            .ShowTitle(true).Title("Компонент")
+                        )
+                    .Form(f => f
+                    .ColCount(1)
+                    .Items(items =>
+                    {
+                        items.AddSimpleFor(m => m.Name);
+                        items.AddSimpleFor(m => m.Parentid).Editor(editor => editor.Lookup());
+                        items.AddSimpleFor(m => m.Caption);
+                        items.AddSimpleFor(m => m.Viewname);
+                        items.AddSimpleFor(m => m.Sortorder);
+                        items.AddSimpleFor(m => m.Ismenubar).Editor(editor => editor.CheckBox());
+                        items.AddSimpleFor(m => m.Isnavigationbar).Editor(editor => editor.CheckBox());
+                        items.AddSimpleFor(m => m.Issecret).Editor(editor => editor.CheckBox());
+                        items.AddSimpleFor(m => m.Trial).Editor(editor => editor.CheckBox());
+                        items.AddSimpleFor(m => m.Isadmin).Editor(editor => editor.CheckBox());
+                        items.AddSimpleFor(m => m.Updatedate).Editor(editor => editor.DateBox()
+                                                                         .Type(DateBoxType.Date)
+                                                                         .DateSerializationFormat("yyyy-MM-dd"));
+                    })
+                    .LabelLocation(FormLabelLocation.Left)
+                    .ShowColonAfterLabel(true)
+                    .MinColWidth(100)
+                    .ShowValidationSummary(true)
+                    );
+                    editing.AllowAdding(true);
+                    editing.AllowDeleting(true);
+                    editing.AllowUpdating(true);
+                    editing.UseIcons(true);
+                })
+                .Columns(columns =>
+                {
+                    columns.AddFor(wp => wp.Name)
+                    .Caption("Компонент");
+
+                    columns.AddFor(wp => wp.Parentid)
+                        .Lookup(lookup => lookup
+                        .DataSource(d => d.Mvc()
+                        .Controller("PermissionsControl")
+                        .LoadAction("SdsParentsWebplugins")
+                        .Key("Id"))
+                        .ValueExpr("Id")
+                        .DisplayExpr("Name")
+                        )
+                    .Caption("Родительский компонент")
+                    .ValidationRules(x => x.AddRequired())
+                    ;
+
+                    columns.AddFor(wp => wp.Caption)
+                    .Width("15%")
+                    .Caption("Заголовок компонента");
+
+                    columns.AddFor(wp => wp.Viewname)
+                    .Width("25%")
+                    .Caption("Путь");
+
+                    columns.AddFor(wp => wp.Sortorder)
+                    .Width("5%")
+                    .Caption("Сортировка");
+
+                    columns.AddFor(wp => wp.Ismenubar)
+                     .Alignment(HorizontalAlignment.Center)
+                     .Width("5%")
+                     .Caption("В меню");
+
+                    columns.AddFor(wp => wp.Isnavigationbar)
+                     .Alignment(HorizontalAlignment.Center)
+                     .Width("5%")
+                     .Caption("В панели навигации");
+
+                    columns.AddFor(wp => wp.Issecret)
+                     .Alignment(HorizontalAlignment.Center)
+                     .Width("5%")
+                     .Caption("Коммерческая тайна");
+
+                    columns.AddFor(wp => wp.Trial)
+                     .Alignment(HorizontalAlignment.Center)
+                     .Width("5%")
+                     .Caption("Ознакомительная версия");
+
+                    columns.AddFor(wp => wp.Isadmin)
+                     .Alignment(HorizontalAlignment.Center)
+                     .Width("5%")
+                     .Caption("Административный");
+
+                    columns.AddFor(wp => wp.Updatedate)
+                     .Alignment(HorizontalAlignment.Center)
+                     .Caption("Дата обновления")
+                     .Width("10%")
+                     .DataType(GridColumnDataType.Date)
+                     ;
+
+                })
+        )
+}
+
+@using (Html.DevExtreme().NamedTemplate("gridContainer-eccessRights"))
+{
+          
+    @(
+        Html.Emas().DataGrid<RolesWebPluginsDTO>()
+        .ID("AccessRightsStateGrid")
+        .ApplyConfiguration("dictionary.lite")
+                .OnEditorPreparing("eccessRightsGridStateChanged")
+        .Height("calc(100vh - 180px)")
+                .FilterRow(filterRow => filterRow
+                    .Visible(true)
+                    .ApplyFilter(GridApplyFilterMode.Auto))
+                .DataSource(d => d.Mvc()
+                    .Controller("PermissionsControl")
+                    .LoadAction("RolesWebPluginsInit")
+                    .InsertAction("RolesWebPluginsInsert")
+                    .UpdateAction("RolesWebPluginsUpdate")
+                    .DeleteAction("RolesWebPluginsDelete")
+                    .Key("Id"))
+                .Editing(editing =>
+                {
+                    editing.Mode(GridEditMode.Popup)
+                        .Popup(p => p
+                            .Width(750)
+                            .Height(450)
+                                .ShowTitle(true).Title("Права доступа")
+                        )
+                        .Form(f => f
+                            .ColCount(1)
+                            .Items(items =>
+                            {
+                                items.AddSimpleFor(m => m.Roleid).Editor(editor => editor.Lookup());
+                                items.AddSimpleFor(m => m.Webpluginid).Editor(editor => editor.Lookup());
+                                items.AddSimpleFor(m => m.IsFullControl).Editor(editor => editor.CheckBox().ID("IsFullControlCBX"));
+                                items.AddSimpleFor(m => m.IsCreate).Editor(editor => editor.CheckBox().ID("IsCreateCBX"));
+                                items.AddSimpleFor(m => m.IsEdit).Editor(editor => editor.CheckBox().ID("IsEditCBX"));
+                                items.AddSimpleFor(m => m.IsDelete).Editor(editor => editor.CheckBox().ID("IsDeleteCBX"));
+                                items.AddSimpleFor(m => m.IsApprove).Editor(editor => editor.CheckBox().ID("IsApproveCBX"));
+                            })
+                            .LabelLocation(FormLabelLocation.Left)
+                            .ShowColonAfterLabel(true)
+                            .MinColWidth(100)
+                            .ShowValidationSummary(true)
+                        );
+                    editing.AllowAdding(true);
+                    editing.AllowDeleting(true);
+                    editing.AllowUpdating(true);
+                    editing.UseIcons(true);
+                })
+                .Columns(columns =>
+                {
+                    columns.AddFor(wp => wp.Roleid)
+                        .Lookup(lookup => lookup.DataSource(d => d.Mvc().Controller("PermissionsControl").LoadAction("RolesInit").Key("Id"))
+                        .ValueExpr("Id")
+                        .DisplayExpr("Name"))
+                        .Caption("Роль");
+
+                    columns.AddFor(wp => wp.Webpluginid)
+                        .Lookup(lookup => lookup.DataSource(d => d.Mvc().Controller("PermissionsControl").LoadAction("SdsParentsWebplugins").Key("Id"))
+                        .ValueExpr("Id")
+                        .DisplayExpr("Caption"))
+                        .Caption("Компонент");
+
+                    columns.AddFor(wp => wp.IsFullControl)
+                        .Alignment(HorizontalAlignment.Center)
+                        .Width("5%")
+                        .Caption("Полный доступ");
+
+                    columns.AddFor(wp => wp.IsCreate)
+                        .Alignment(HorizontalAlignment.Center)
+                        .Width("5%")
+                        .Caption("Создание");
+
+                    columns.AddFor(wp => wp.IsEdit)
+                        .Alignment(HorizontalAlignment.Center)
+                        .Width("5%")
+                        .Caption("Редактирование");
+
+                    columns.AddFor(wp => wp.IsDelete)
+                        .Alignment(HorizontalAlignment.Center)
+                        .Width("5%")
+                        .Caption("Удаление");
+
+                    columns.AddFor(wp => wp.IsApprove)
+                        .Alignment(HorizontalAlignment.Center)
+                        .Width("5%")
+                        .Caption("Визирование");
+                })
+        )
+}
+
+@using (Html.DevExtreme().NamedTemplate("gridContainer-rolesReports"))
+{
+    @(Html.Emas().DataGrid<ReportsRolesDTO>()
+    .ID("ReportRolesGrid")
+    .ApplyConfiguration("dictionary.lite")     
+    .Height("calc(100vh - 180px)")
+        .FilterRow(filterRow => filterRow
+        .Visible(true)
+        .ApplyFilter(GridApplyFilterMode.Auto)
+        )
+
+        .DataSource(d => d.Mvc()
+        .Controller("PermissionsControl")
+        .LoadAction("ReportsRolesInit")
+        .InsertAction("ReportsRolesInsert")
+        .UpdateAction("ReportsRolesUpdate")
+        .DeleteAction("ReportsRolesDelete")
+
+        .Key("Id")
+        )
+       .Editing(editing =>
+       {
+           editing.Mode(GridEditMode.Popup)
+               .Popup(p => p
+               .Width(750)
+               .Height(250)
+                   .ShowTitle(true).Title("Права на отчет")
+               )
+               .Form(f => f
+               .ColCount(1)
+               .Items(items =>
+                {
+                    items.AddSimpleFor(m => m.Reportid).Editor(editor => editor.Lookup());
+                    items.AddSimpleFor(m => m.Roleid).Editor(editor => editor.Lookup());
+                })
+               .LabelLocation(FormLabelLocation.Left)
+               .ShowColonAfterLabel(true)
+               .MinColWidth(100)
+               .ShowValidationSummary(true)
+           );
+           editing.AllowAdding(true);
+           editing.AllowDeleting(true);
+           editing.AllowUpdating(true);
+           editing.UseIcons(true);
+       })
+        .Columns(columns =>
+        {
+            columns.AddFor(wp => wp.Reportid)
+            .Lookup(lookup => lookup.DataSource(d => d.Mvc().Controller("PermissionsControl").LoadAction("ReportsInit").Key("Id"))
+            .ValueExpr("Id")
+            .DisplayExpr("Name"))
+            .Caption("Отчет");
+
+            columns.AddFor(wp => wp.Roleid)
+            .Lookup(lookup => lookup.DataSource(d => d.Mvc().Controller("PermissionsControl").LoadAction("RolesInit").Key("Id"))
+            .ValueExpr("Id")
+            .DisplayExpr("Name"))
+            .Caption("Роль");
+        })
+        )
+
+}
+
+@using (Html.DevExtreme().NamedTemplate("gridContainer-analyticsPanels"))
+{
+    @(Html.Emas().DataGrid<DashRoleDashboardDTO>()
+        .ID("DashboardRolesGrid")
+        .ApplyConfiguration("dictionary.lite") 
+        .Height("calc(100vh - 180px)")
+            .FilterRow(filterRow => filterRow
+            .Visible(true)
+            .ApplyFilter(GridApplyFilterMode.Auto)
+            )
+
+            .DataSource(d => d.Mvc()
+            .Controller("PermissionsControl")
+            .LoadAction("DashboardsRolesInit")
+            .InsertAction("DashboardsRolesInsert")
+            .UpdateAction("DashboardsRolesUpdate")
+            .DeleteAction("DashboardsRolesDelete")
+
+            .Key("Id")
+            )
+           .OnEditingStart("onEditingStart")
+           .Editing(editing =>
+           {
+               editing.Mode(GridEditMode.Popup)
+                   .Popup(p => p
+                        .Width(750)
+                        .Height(250).ShowTitle(true).OnShowing("setPopupTitle")
+                   )
+                   .Form(f => f
+                   .ColCount(1)
+                   .Items(items =>
+                    {
+                        items.AddSimpleFor(m => m.DashboardId).Editor(editor => editor.Lookup());
+                        items.AddSimpleFor(m => m.RoleId).Editor(editor => editor.Lookup());
+                    })
+                   .LabelLocation(FormLabelLocation.Left)
+                   .ShowColonAfterLabel(true)
+                   .MinColWidth(100)
+                   .ShowValidationSummary(true)
+               );
+               editing.AllowAdding(true);
+               editing.AllowDeleting(true);
+               editing.AllowUpdating(true);
+               editing.UseIcons(true);
+           })
+            .Columns(columns =>
+            {
+                columns.AddFor(wp => wp.RoleId)
+                 .Lookup(lookup => lookup.DataSource(d => d.Mvc().Controller("PermissionsControl").LoadAction("RolesInit").Key("Id"))
+                 .ValueExpr("Id")
+                 .DisplayExpr("Name"))
+                 .Caption("Роль");
+                columns.AddFor(wp => wp.DashboardId)
+                 .Lookup(lookup => lookup.DataSource(d => d.Mvc().Controller("PermissionsControl").LoadAction("DashboardsInit").Key("Id"))
+                 .ValueExpr("Id")
+                 .DisplayExpr("Caption"))
+                 .Caption("Аналитическая панель");
+
+            })
+            )
+}
+@using (Html.DevExtreme().NamedTemplate("gridContainer-inFormValues"))
+{
+        @(Html.Emas().DataGrid<WebPluginIndicator>()
+            .ID("WebPluginIndicatorGrid")
+            .ApplyConfiguration("dictionary.lite")
+            .Height("calc(100vh - 180px)")
+            .FilterRow(filterRow => filterRow
+                        .Visible(true)
+                        .ApplyFilter(GridApplyFilterMode.Auto))
+
+            .DataSource(d => d.Mvc()
+                        .Controller("PermissionsControl")
+                        .LoadAction("WebPluginIndicatorInit")
+                        .InsertAction("WebPluginIndicatorInsert")
+                        .UpdateAction("WebPluginIndicatorUpdate")
+                        .DeleteAction("WebPluginIndicatorDelete")
+                        .Key("Id")
+                    )
+           .OnEditingStart("onEditingStart")
+           .Editing(editing =>
+           {
+               editing.Mode(GridEditMode.Popup)
+                   .Popup(p => p
+                        .Width(750)
+                        .Height(250).ShowTitle(true).OnShowing("setPopupTitle")
+                   );
+
+               editing.AllowAdding(true);
+               editing.AllowDeleting(true);
+               editing.AllowUpdating(true);
+               editing.UseIcons(true);
+           })
+            .Columns(columns =>
+            {
+                columns.AddFor(wp => wp.Name)
+                       .Caption("Показатель");
+                columns.AddFor(wp => wp.Caption)
+                      .Caption("Заголовок");
+                columns.AddFor(wp => wp.Webpluginid)
+                        .Lookup(lookup => lookup
+                                                .DataSource(d => d.Mvc()
+                                                            .Controller("PermissionsControl")
+                                                            .LoadAction("LookupWebPlugins")
+                                                            .Key("Id"))
+                                                            .ValueExpr("Id")
+                                                            .DisplayExpr("Name")
+                                                )
+                      .Caption("Компонент");
+                columns.AddFor(wp => wp.Isactive)
+                      .Caption("Виден");
+            })
+            )
+}
+
+@using (Html.DevExtreme().NamedTemplate("gridContainer-workAsAnotherUser"))
+{
+    @(Html.DevExtreme().SelectBox()
+                           .DataSource(d => d.Mvc()
+                                           .Controller("PermissionsControl")
+                                           .LoadAction("GetUsers")
+                                           .Key("Name")
+                                       )
+                           .ValueExpr("Name")
+                           .DisplayExpr("Name")
+                           .ID("permissionOtherUserSelectBox")
+                           .DropDownOptions(o => o.Width(800))
+                           .Width("800px")
+                           .Placeholder("")
+                           .OnValueChanged("onUserChanged")
+        )
+}
+
+@(Html.DevExtreme().Popup()
+    .ID("role-popup")
+    .Width(600)
+    .Height(200)
+    .ShowTitle(true)
+    .Title("Копировать права доступа")
+    .Visible(false)
+    .DragEnabled(false)
+    .CloseOnOutsideClick(true)
+)
+@using (Html.DevExtreme().NamedTemplate("popup-template"))
+{
+    <div id="role-caption">Для роли "" будут скопированы права следующей роли: </div>
+    <br />
+
+    @(Html.DevExtreme().Lookup()
+                .ID("lbox")
+                 .DataSource(d => d.Mvc()
+                    .Controller("PermissionsControl")
+                    .LoadAction("RolesInit")
+                    .Key("Id"))
+                    .ValueExpr("Id")
+                    .DisplayExpr("Name")
+     ) 
+     <br />
+     <br />
+     <table>
+        <tr>
+             <td>
+    @(Html.DevExtreme().Button()
+    .ID("btnCopyRole")
+    .Text("Копировать")
+    .OnClick("btnCopyRole_Click")
+    )
+             </td>
+             <td>
+    @(Html.DevExtreme().Button()
+    .ID("btnCanselRole")
+    .Text("Отмена")
+    .OnClick("function() { $('#role-popup').dxPopup('hide'); }")
+    )
+             </td>
+
+         </tr>
+     </table>
+   
+
+   
+}
+
+@(Html.DevExtreme().Popup()
+    .ID("roleolap-popup")
+    .Width(600)
+    .Height(270)
+    .ShowTitle(true)
+    .Title("Копировать права доступа")
+    .Visible(false)
+    .DragEnabled(false)
+    .CloseOnOutsideClick(true)
+)
+@using (Html.DevExtreme().NamedTemplate("olappopup-template"))
+{
+    <div id="roleolap-caption-security" style="display:none;">c</div>
+    <div id="roleolap-caption-from">Будут скопированы права доступа из роли:</div>
+    <br />
+
+    @(Html.DevExtreme().Lookup()
+                .ID("lboxolapfrom")
+                 .DataSource(d => d.Mvc()
+                    .Controller("PermissionsControl")
+                    .LoadAction("RolesInit")
+                    .Key("Id"))
+                    .ValueExpr("Id")
+                    .DisplayExpr("Name")
+     ) 
+     <br />
+     <div id="roleolap-caption-from">в роль:</div>
+     <br />
+     @(Html.DevExtreme().Lookup()
+                .ID("lboxolapto")
+                 .DataSource(d => d.Mvc()
+                    .Controller("PermissionsControl")
+                    .LoadAction("RolesInit")
+                    .Key("Id"))
+                    .ValueExpr("Id")
+                    .DisplayExpr("Name")
+     ) 
+
+     <br />
+     <br />
+     <table>
+        <tr>
+             <td>
+    @(Html.DevExtreme().Button()
+    .ID("btnCopyRoleOlap")
+    .Text("Копировать")
+    .OnClick("btnCopyRoleOlap_Click")
+    )
+             </td>
+             <td>
+    @(Html.DevExtreme().Button()
+    .ID("btnCancelRoleOlap")
+    .Text("Отмена")
+    .OnClick("function() { $('#roleolap-popup').dxPopup('hide'); }")
+    )
+             </td>
+
+         </tr>
+     </table>
+   
+
+   
+}
+
+@using (Html.DevExtreme().NamedTemplate("cubeAccess"))
+{
+    /*
+    <table class="form">
+        <tr>
+            <td class="form-td">
+                OLAP схема:
+            </td>
+            <td class="form-td">
+                @(
+                    Html.DevExtreme().SelectBox().DataSource(d => d.Mvc().Controller("PermissionsControl")
+                    .LoadAction("GetShemaFilePathList").Key("Key")).ValueExpr("Key").DisplayExpr("Value").ID("shemafiles_PermissionCube")
+                    .Width("400px")
+                    .DropDownOptions(o => o.Width(350)).Value(0)
+                    )
+            </td>
+            <td class="form-td" valign="bottom">
+                @(Html.DevExtreme().Button()
+                    .ID("buttonRefresh_PermissionCube")
+                    .Text("Применить")
+                        .OnClick("refresh_OLAPcube")
+                 )
+            </td>
+            <td class="form-td">
+                @(Html.DevExtreme().Button()
+                    .ID("buttonCopyRole_PermissionCube")
+                    .Text("Копировать права доступа")
+                    .OnClick("showRolePopupOlapCube")
+                    )
+
+            </td>
+
+        </tr>
+    </table>
+    */
+     <div id=cubeAccessGrid></div>
+}
+
+@using (Html.DevExtreme().NamedTemplate("dimensionAccess"))
+{
+    /*
+    <table class="form">
+        <tr>
+            <td class="form-td">
+                OLAP схема:
+            </td>
+            <td class="form-td">
+                @(
+                    Html.DevExtreme().SelectBox().DataSource(d => d.Mvc().Controller("PermissionsControl")
+                    .LoadAction("GetShemaFilePathList").Key("Key")).ValueExpr("Key").DisplayExpr("Value").ID("shemafiles_PermissionDimension")
+                    .Width("400px")
+                    .DropDownOptions(o => o.Width(350)).Value(0)
+                    )
+            </td>
+            <td class="form-td" valign="bottom">
+                @(Html.DevExtreme().Button()
+                    .ID("buttonRefresh_PermissionDimension")
+                    .Text("Применить")
+                    .OnClick("refresh_OLAPdimension")
+                    )
+            </td>
+        </tr>
+    </table>
+    */
+    <div id=dimensionAccessGrid></div>
+}
+
+@using (Html.DevExtreme().NamedTemplate("rolestationAccess"))
+{
+    /*
+    <table class="form">
+        <tr>
+            <td class="form-td">
+                OLAP схема:
+            </td>
+            <td class="form-td">
+                @(
+                    Html.DevExtreme().SelectBox().DataSource(d => d.Mvc().Controller("PermissionsControl")
+                    .LoadAction("GetShemaFilePathList").Key("Key")).ValueExpr("Key").DisplayExpr("Value").ID("shemafiles_PermissionRolebystation")
+                    .Width("400px")
+                    .DropDownOptions(o => o.Width(350)).Value(0)
+                    )
+            </td>
+            <td class="form-td" valign="bottom">
+                @(Html.DevExtreme().Button()
+                    .ID("buttonRefresh_PermissionRolebystation")
+                    .Text("Применить")
+                    .OnClick("refresh_OLAProlebystation")
+                    )
+            </td>
+        </tr>
+    </table>
+    */
+    <div id=rolestationAccessGrid></div>
+}
